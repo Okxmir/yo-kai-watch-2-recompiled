@@ -1,0 +1,294 @@
+#include "settings.h"
+
+#include "frontend.h"
+#include "platform.h"
+
+#include <SDL3/SDL.h>
+
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <map>
+
+namespace frontend {
+
+const ControlInfo CONTROLS[CONTROL_COUNT] = {
+    {"a", "A", BTN_A},
+    {"b", "B", BTN_B},
+    {"x", "X", BTN_X},
+    {"y", "Y", BTN_Y},
+    {"l", "L", BTN_L},
+    {"r", "R", BTN_R},
+    {"zl", "ZL", BTN_ZL},
+    {"zr", "ZR", BTN_ZR},
+    {"start", "Start", BTN_START},
+    {"select", "Select", BTN_SELECT},
+    {"up", "D-Pad Up", BTN_UP},
+    {"down", "D-Pad Down", BTN_DOWN},
+    {"left", "D-Pad Left", BTN_LEFT},
+    {"right", "D-Pad Right", BTN_RIGHT},
+    {"circle_up", "Circle Pad Up", 0},
+    {"circle_down", "Circle Pad Down", 0},
+    {"circle_left", "Circle Pad Left", 0},
+    {"circle_right", "Circle Pad Right", 0},
+};
+
+void Settings::reset_controls() {
+    static constexpr int KEYS[CONTROL_COUNT] = {
+        SDL_SCANCODE_K,      SDL_SCANCODE_J,         SDL_SCANCODE_I,    SDL_SCANCODE_U,    SDL_SCANCODE_Q,
+        SDL_SCANCODE_E,      SDL_SCANCODE_1,         SDL_SCANCODE_3,    SDL_SCANCODE_RETURN,
+        SDL_SCANCODE_BACKSPACE, SDL_SCANCODE_UP,     SDL_SCANCODE_DOWN, SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT,
+        SDL_SCANCODE_W,      SDL_SCANCODE_S,         SDL_SCANCODE_A,    SDL_SCANCODE_D,
+    };
+    // by position, Nintendo layout: east is A, south is B; the left stick is always the circle pad
+    static constexpr int PAD[CONTROL_COUNT] = {
+        SDL_GAMEPAD_BUTTON_EAST,      SDL_GAMEPAD_BUTTON_SOUTH,     SDL_GAMEPAD_BUTTON_NORTH,
+        SDL_GAMEPAD_BUTTON_WEST,      SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,
+        PAD_LEFT_TRIGGER,             PAD_RIGHT_TRIGGER,            SDL_GAMEPAD_BUTTON_START,
+        SDL_GAMEPAD_BUTTON_BACK,      SDL_GAMEPAD_BUTTON_DPAD_UP,   SDL_GAMEPAD_BUTTON_DPAD_DOWN,
+        SDL_GAMEPAD_BUTTON_DPAD_LEFT, SDL_GAMEPAD_BUTTON_DPAD_RIGHT, PAD_NONE,
+        PAD_NONE,                     PAD_NONE,                     PAD_NONE,
+    };
+    for (int i = 0; i < CONTROL_COUNT; i++) keys[i] = KEYS[i], pad[i] = PAD[i];
+}
+
+std::string key_name(int scancode) {
+    if (scancode == SDL_SCANCODE_UNKNOWN) return "-";
+    const char *n = SDL_GetScancodeName(SDL_Scancode(scancode));
+    return n && *n ? n : "?";
+}
+
+std::string pad_name(int code) {
+    if (code == PAD_NONE) return "-";
+    if (code == PAD_LEFT_TRIGGER) return "Left Trigger";
+    if (code == PAD_RIGHT_TRIGGER) return "Right Trigger";
+    static const std::map<int, const char *> names = {
+        {SDL_GAMEPAD_BUTTON_SOUTH, "South (B/Cross)"}, {SDL_GAMEPAD_BUTTON_EAST, "East (A/Circle)"},
+        {SDL_GAMEPAD_BUTTON_WEST, "West (Y/Square)"},  {SDL_GAMEPAD_BUTTON_NORTH, "North (X/Triangle)"},
+        {SDL_GAMEPAD_BUTTON_BACK, "Back/Select"},      {SDL_GAMEPAD_BUTTON_START, "Start"},
+        {SDL_GAMEPAD_BUTTON_LEFT_STICK, "Left Stick"}, {SDL_GAMEPAD_BUTTON_RIGHT_STICK, "Right Stick"},
+        {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, "Left Bumper"}, {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, "Right Bumper"},
+        {SDL_GAMEPAD_BUTTON_DPAD_UP, "D-Pad Up"},      {SDL_GAMEPAD_BUTTON_DPAD_DOWN, "D-Pad Down"},
+        {SDL_GAMEPAD_BUTTON_DPAD_LEFT, "D-Pad Left"},  {SDL_GAMEPAD_BUTTON_DPAD_RIGHT, "D-Pad Right"},
+    };
+    auto it = names.find(code);
+    if (it != names.end()) return it->second;
+    const char *n = SDL_GetGamepadStringForButton(SDL_GamepadButton(code));
+    return n ? n : "?";
+}
+
+namespace {
+
+std::filesystem::path file() { return platform::data_dir() / "settings.ini"; }
+
+std::string pad_id(int code) {
+    if (code == PAD_NONE) return "";
+    if (code == PAD_LEFT_TRIGGER) return "lefttrigger";
+    if (code == PAD_RIGHT_TRIGGER) return "righttrigger";
+    const char *n = SDL_GetGamepadStringForButton(SDL_GamepadButton(code));
+    return n ? n : "";
+}
+
+int pad_from_id(const std::string &s) {
+    if (s.empty()) return PAD_NONE;
+    if (s == "lefttrigger") return PAD_LEFT_TRIGGER;
+    if (s == "righttrigger") return PAD_RIGHT_TRIGGER;
+    SDL_GamepadButton b = SDL_GetGamepadButtonFromString(s.c_str());
+    return b == SDL_GAMEPAD_BUTTON_INVALID ? PAD_NONE : int(b);
+}
+
+} // namespace
+
+void Settings::load() {
+    std::ifstream f(file());
+    std::string line;
+    while (std::getline(f, line)) {
+        auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+        bool b = v == "1";
+        if (k == "game_path") game_path = v;
+        else if (k == "dump_folder") dump_folder = v;
+        else if (k.rfind("dump.", 0) == 0) dumps[std::strtoull(k.c_str() + 5, nullptr, 16)] = v;
+        else if (k.rfind("update.", 0) == 0) updates[std::strtoull(k.c_str() + 7, nullptr, 16)] = v;
+        else if (k.rfind("layout.", 0) == 0) layouts[k.substr(7)] = v;
+        else if (k == "show_launcher") show_launcher = b;
+        else if (k == "launcher_fullscreen") launcher_fullscreen = b;
+        else if (k == "menu_music") menu_music = b;
+        else if (k == "check_updates") check_updates = b;
+        else if (k == "update_channel") update_channel = v;
+        else if (k == "single_screen") single_screen = b;
+        else if (k == "dual_layout") dual_layout = std::clamp(std::atoi(v.c_str()), 0, 5);
+        else if (k == "detached_screen") detached_screen = b;
+        else if (k == "detached_fullscreen") detached_fullscreen = b;
+        else if (k == "main_display") main_display = std::clamp(std::atoi(v.c_str()),0,15);
+        else if (k == "detached_display") detached_display = std::clamp(std::atoi(v.c_str()),0,15);
+        else if (k == "top_size") top_size = std::clamp(std::atoi(v.c_str()),25,200);
+        else if (k == "bottom_size") bottom_size = std::clamp(std::atoi(v.c_str()),25,200);
+        else if (k == "screen_gap") screen_gap = std::clamp(std::atoi(v.c_str()),0,200);
+        else if (k == "pip_size") pip_size = std::clamp(std::atoi(v.c_str()),15,90);
+        else if (k == "pip_x") pip_x = std::clamp(std::atoi(v.c_str()),0,100);
+        else if (k == "pip_y") pip_y = std::clamp(std::atoi(v.c_str()),0,100);
+        else if (k == "pip_opacity") pip_opacity = std::clamp(std::atoi(v.c_str()),10,100);
+        else if (k == "custom_top_x") custom_top_x = std::clamp(std::atoi(v.c_str()),0,2000);
+        else if (k == "custom_top_y") custom_top_y = std::clamp(std::atoi(v.c_str()),0,2000);
+        else if (k == "custom_bottom_x") custom_bottom_x = std::clamp(std::atoi(v.c_str()),0,2000);
+        else if (k == "custom_bottom_y") custom_bottom_y = std::clamp(std::atoi(v.c_str()),0,2000);
+        else if (k == "background_rgb") background_rgb = uint32_t(std::strtoul(v.c_str(), nullptr, 16)) & 0xffffff;
+        else if (k == "swap_screens") swap_screens = b;
+        else if (k == "picture_in_picture") picture_in_picture = b;
+        else if (k == "smart_layout") smart_layout = b;
+        else if (k == "widescreen") widescreen = b;
+        else if (k == "aspect_mode") aspect_mode = std::clamp(std::atoi(v.c_str()), 0, 5);
+        else if (k == "aspect_num") aspect_num = std::clamp(std::atoi(v.c_str()), 1, 1000);
+        else if (k == "aspect_den") aspect_den = std::clamp(std::atoi(v.c_str()), 1, 1000);
+        else if (k == "window_width") window_width = std::clamp(std::atoi(v.c_str()), 0, 8192);
+        else if (k == "window_height") window_height = std::clamp(std::atoi(v.c_str()), 0, 4320);
+        else if (k == "window_mode") window_mode = std::clamp(std::atoi(v.c_str()), 0, 2);
+        else if (k == "fullscreen") fullscreen = b;
+        else if (k == "vsync") vsync = b;
+        else if (k == "filter") filter = std::atoi(v.c_str());
+        else if (k == "resolution") resolution = std::clamp(std::atoi(v.c_str()), 1, 10);
+        else if (k == "hud_size") hud_size = std::atoi(v.c_str());
+        else if (k == "camera_zoom") camera_zoom = std::atoi(v.c_str());
+        else if (k == "gpu_renderer") gpu_renderer = b;
+        else if (k == "frame_interpolation") frame_interpolation = b;
+        else if (k == "frame_limit") { int rate = std::atoi(v.c_str()); frame_limit = rate == 30 || rate == 60 ? rate : 0; }
+        else if (k == "performance_profile") performance_profile = std::clamp(std::atoi(v.c_str()),0,3);
+        else if (k == "texture_cache_mib") texture_cache_mib = std::clamp(std::atoi(v.c_str()),32,512);
+        else if (k == "prewarm_pipelines") prewarm_pipelines = b;
+        else if (k == "show_stats") show_stats = b;
+        else if (k == "hd_textures") hd_textures = false; // ignore obsolete pack setting
+        else if (k == "texture_sampling") texture_sampling = std::clamp(std::atoi(v.c_str()),0,6);
+        else if (k == "fxaa") fxaa = b;
+        else if (k == "sharpening") sharpening = std::clamp(std::atoi(v.c_str()),0,100);
+        else if (k == "ai_upscale") ai_upscale = b;
+        else if (k == "ai_upscale_factor") ai_upscale_factor = std::atoi(v.c_str()) >= 4 ? 4 : 2;
+        else if (k == "prefer_integrated_gpu") prefer_integrated_gpu = b;
+        else if (k == "volume") volume = std::atoi(v.c_str());
+        else if (k == "audio_device") audio_device = v;
+        else if (k == "mute_in_background") mute_in_background = b;
+        else if (k == "mono") mono = b;
+        else if (k == "relay") relay = v;
+        else if (k == "player_name") player_name = v;
+        else if (k == "room") room = v;
+        else if (k == "room_password") room_password = v;
+        else if (k == "language") language = EUR_LANGUAGE_IDS[eur_language_index(std::atoi(v.c_str()))];
+        else if (k == "audio_latency") audio_latency = std::clamp(std::atoi(v.c_str()), 0, 2);
+        else if (k == "stick_deadzone") stick_deadzone = std::clamp(std::atoi(v.c_str()), 0, 50);
+        else if (k == "stick_sensitivity") stick_sensitivity = std::clamp(std::atoi(v.c_str()), 50, 150);
+        else
+            for (int i = 0; i < CONTROL_COUNT; i++) {
+                if (k == std::string("key_") + CONTROLS[i].id) keys[i] = SDL_GetScancodeFromName(v.c_str());
+                if (k == std::string("pad_") + CONTROLS[i].id) pad[i] = pad_from_id(v);
+            }
+    }
+    if (aspect_mode < 0) aspect_mode = widescreen ? 1 : 0;
+    widescreen = aspect_mode != 0;
+    if (fullscreen && window_mode == 0) window_mode = 1; // legacy config
+}
+
+std::pair<int,int> Settings::aspect_ratio() const {
+    switch (aspect_mode) {
+    case 1: return {16,9};
+    case 2: return {16,10};
+    case 3: return {21,9};
+    case 4: return {32,9};
+    case 5: return {aspect_num,aspect_den};
+    default: return {5,3};
+    }
+}
+
+void Settings::save() const {
+    std::ofstream f(file());
+    f << "game_path=" << game_path << "\n"
+      << "dump_folder=" << dump_folder << "\n";
+    for (auto &[id, path] : dumps) {
+        char key[32];
+        std::snprintf(key, sizeof key, "dump.%016llx=", (unsigned long long)id);
+        f << key << path << "\n";
+    }
+    for (auto &[id, path] : updates) {
+        char key[32];
+        std::snprintf(key, sizeof key, "update.%016llx=", (unsigned long long)id);
+        f << key << path << "\n";
+    }
+    f << "show_launcher=" << show_launcher << "\n"
+      << "launcher_fullscreen=" << launcher_fullscreen << "\n"
+      << "menu_music=" << menu_music << "\n"
+      << "check_updates=" << check_updates << "\n"
+      << "update_channel=" << update_channel << "\n"
+      << "single_screen=" << single_screen << "\n"
+      << "dual_layout=" << dual_layout << "\n"
+      << "detached_screen=" << detached_screen << "\n"
+      << "detached_fullscreen=" << detached_fullscreen << "\n"
+      << "main_display=" << main_display << "\n"
+      << "detached_display=" << detached_display << "\n"
+      << "top_size=" << top_size << "\n"
+      << "bottom_size=" << bottom_size << "\n"
+      << "screen_gap=" << screen_gap << "\n"
+      << "pip_size=" << pip_size << "\n"
+      << "pip_x=" << pip_x << "\n"
+      << "pip_y=" << pip_y << "\n"
+      << "pip_opacity=" << pip_opacity << "\n"
+      << "custom_top_x=" << custom_top_x << "\n"
+      << "custom_top_y=" << custom_top_y << "\n"
+      << "custom_bottom_x=" << custom_bottom_x << "\n"
+      << "custom_bottom_y=" << custom_bottom_y << "\n"
+      << "background_rgb=" << std::hex << background_rgb << std::dec << "\n"
+      << "swap_screens=" << swap_screens << "\n"
+      << "picture_in_picture=" << picture_in_picture << "\n"
+      << "smart_layout=" << smart_layout << "\n"
+      << "widescreen=" << widescreen << "\n"
+      << "aspect_mode=" << (aspect_mode < 0 ? int(widescreen) : aspect_mode) << "\n"
+      << "aspect_num=" << aspect_num << "\n"
+      << "aspect_den=" << aspect_den << "\n"
+      << "window_width=" << window_width << "\n"
+      << "window_height=" << window_height << "\n"
+      << "window_mode=" << window_mode << "\n"
+      << "fullscreen=" << fullscreen << "\n"
+      << "vsync=" << vsync << "\n"
+      << "filter=" << filter << "\n"
+      << "resolution=" << resolution << "\n"
+      << "hud_size=" << hud_size << "\n"
+      << "camera_zoom=" << camera_zoom << "\n"
+      << "gpu_renderer=" << gpu_renderer << "\n"
+      << "frame_interpolation=" << frame_interpolation << "\n"
+      << "frame_limit=" << frame_limit << "\n"
+      << "performance_profile=" << performance_profile << "\n"
+      << "texture_cache_mib=" << texture_cache_mib << "\n"
+      << "prewarm_pipelines=" << prewarm_pipelines << "\n"
+      << "show_stats=" << show_stats << "\n"
+      << "hd_textures=" << hd_textures << "\n"
+      << "texture_sampling=" << texture_sampling << "\n"
+      << "fxaa=" << fxaa << "\n"
+      << "sharpening=" << sharpening << "\n"
+      << "ai_upscale=" << ai_upscale << "\n"
+      << "ai_upscale_factor=" << ai_upscale_factor << "\n"
+      << "prefer_integrated_gpu=" << prefer_integrated_gpu << "\n"
+      << "volume=" << volume << "\n"
+      << "audio_device=" << audio_device << "\n"
+      << "mute_in_background=" << mute_in_background << "\n"
+      << "mono=" << mono << "\n"
+      << "audio_latency=" << audio_latency << "\n"
+      << "stick_deadzone=" << stick_deadzone << "\n"
+      << "stick_sensitivity=" << stick_sensitivity << "\n"
+      << "language=" << language << "\n"
+      << "relay=" << relay << "\n"
+      << "player_name=" << player_name << "\n"
+      << "room=" << room << "\n"
+      << "room_password=" << room_password << "\n";
+    for (auto &[key, layout] : layouts) f << "layout." << key << "=" << layout << "\n";
+    for (int i = 0; i < CONTROL_COUNT; i++) {
+        f << "key_" << CONTROLS[i].id << "=" << (keys[i] ? SDL_GetScancodeName(SDL_Scancode(keys[i])) : "") << "\n";
+        f << "pad_" << CONTROLS[i].id << "=" << pad_id(pad[i]) << "\n";
+    }
+}
+
+Settings &settings() {
+    static Settings s;
+    return s;
+}
+
+} // namespace frontend

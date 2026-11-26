@@ -1,0 +1,18 @@
+name: Linux builder checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ninja-build python3 python3-tk libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev libvulkan-dev
+      - name: Verify launcher logic
+        run: python3 -m unittest discover -s launcher/linux -p 'test_*.py'
+      - name: Build Linux runtime without proprietary game data
+        run: bash build.sh --runtime-check --jobs 4

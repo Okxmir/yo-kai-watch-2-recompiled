@@ -1,0 +1,17 @@
+/*.3ds
+/*.cci
+/*.cxi
+/*.cia
+/build/
+/generated/
+/extracted/
+/dist/
+/logs/
+/tests/runs/
+/third_party/
+/launcher-data/
+/input-runtime-*/
+/packages/
+/dist-*/
+__pycache__/
+*.pyc
