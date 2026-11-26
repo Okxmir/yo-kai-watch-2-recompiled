@@ -22,7 +22,7 @@ $launcher=(Resolve-Path -LiteralPath $LauncherPath).Path
 if([Reflection.AssemblyName]::GetAssemblyName($launcher).Version.ToString(3) -ne $Version){throw 'Compile the current launcher before packaging.'}
 $out=Join-Path $root 'packages';New-Item -ItemType Directory $out -Force|Out-Null
 $stage=Join-Path $out ('release-v'+$Version+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss'));New-Item -ItemType Directory $stage -ErrorAction Stop|Out-Null
-$sourceFiles=@('VERSION','README.md','build.cmd','build.ps1','build.sh','YoKaiWatch2Builder','.gitignore','LICENSE','BUILD_INSTRUCTIONS.md','PROGRESS.md','RECOMPILATION_STATUS.md','KNOWN_ISSUES.md','PERFORMANCE.md','ORIGINAL_TIMING_ANALYSIS.md','COMPATIBILITY.md','CHANGELOG.md')
+$sourceFiles=@('VERSION','README.md','build.cmd','build.ps1','build.sh','YoKaiWatch2Builder','.gitignore','LICENSE','BUILD_INSTRUCTIONS.md','CHANGELOG.md')
 foreach($platform in @('Windows','Linux')){
     $name="Yo-kai-Watch-2-$platform-x64-v$Version";$payload=Join-Path $stage $name;New-Item -ItemType Directory $payload|Out-Null
     foreach($file in $sourceFiles){Copy-Item -LiteralPath (Join-Path $root $file) -Destination $payload}

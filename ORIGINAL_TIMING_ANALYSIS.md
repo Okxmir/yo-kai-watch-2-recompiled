@@ -1,7 +1,0 @@
-# Original timing analysis
-
-The pinned native runtime schedules the original display VBlank events in `runtime/src/hle/gsp.cpp` independently of host presentation. Its renderer implements optional geometry-based frame interpolation in `runtime/src/video/gpu/gpu.cpp`; this does not intentionally double ARM simulation updates. The renderer tracks VBlank and the original frame transfer to decide whether to produce a midpoint. It must not be confused with a true 60 Hz simulation patch.
-
-In the current local runtime, interpolation disabled and x1 resolution, the opening movie generated roughly 55–60 top-screen transfers/s and the English title/menu generated 30.0 transfers/s. The house/street exploration also reports approximately 30 top transfers/s and the guest VBlank publication cadence stays near 59.8/s in both host 30 and 60 modes. The same automated movement route reaches Dad in both modes. The interpolator often produces 150 midpoint frames for 150 original 30 FPS frames in steady exploration; unmatched scene transitions can repeat images. Those observations confirm that a uniform forced update rate would be inappropriate. Battle animation, timer, touchscreen and later cutscene rates still need controlled measurement. A port-versus-original comparison requires reference timings from the same game revision; none are claimed yet.
-
-Until validated: leave original game timing unchanged. Distinguish original gameplay simulation, submitted guest frames, interpolated frames and actual host presents in future tests.

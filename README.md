@@ -19,6 +19,6 @@ The 60 FPS option interpolates original rendered frames; it does not force the A
 
 The launchers check this repository's published stable releases, select the newest matching platform builder, verify its size and SHA-256 digest, replace the builder sources and restart. When a newer version is detected, the launcher requests a rebuild before Play is available again. Local ROMs, saves, settings and compiled game data remain on your PC. Keep the complete extracted builder folder.
 
-For command-line builds, compatibility, diagnostics and maintenance, see [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md), [PROGRESS.md](PROGRESS.md) and [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+For command-line builds, Linux prerequisites and save maintenance, see [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md). See [CHANGELOG.md](CHANGELOG.md) for the release history.
 
 This is an independent, unofficial project based on the MIT-licensed [Clockwork runtime](https://github.com/watchmakerers/clockwork), with the original copyright notices retained in `source/clockwork/LICENSE` and `launcher/LICENSE-REFERENCE.txt`. Yo-kai Watch and its characters belong to their respective rights holders. No game ROMs, extracted code/assets, compiled proprietary game executables or player saves are distributed.
