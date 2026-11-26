@@ -41,7 +41,7 @@ internal sealed partial class Launcher
                 updateChecking=false;window.Close();return;
             }
             if(LauncherRequired)updateMessage="The required release is not available yet. Try again when connected to GitHub.";
-        }catch(Exception e){lastUpdateCheck=DateTime.UtcNow;updateMessage="Could not install the update: "+e.Message;}
+        }catch(Exception e){lastUpdateCheck=DateTime.UtcNow;updateMessage="Could not install the update: "+e.Message;try{Directory.CreateDirectory(Path.Combine(core.Root,"logs"));File.WriteAllText(Path.Combine(core.Root,"logs","launcher-update.txt"),e.ToString());}catch{}}
         finally{updateChecking=false;}
         ShowPage(Home);
     }

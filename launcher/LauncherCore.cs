@@ -12,7 +12,8 @@ internal sealed class LauncherCore
     internal readonly string Root, Preferences, Dist, Log;
     internal LauncherCore(string root)
     {
-        Root = Path.GetFullPath(root);
+        string full = Path.GetFullPath(root);
+        Root = full.Length > Path.GetPathRoot(full).Length ? full.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar) : full;
         Dist = Path.Combine(Root, "dist");
         Preferences = Path.Combine(Root, "launcher-data", "launcher.ini");
         Log = Path.Combine(Root, "logs", "launcher-build.txt");

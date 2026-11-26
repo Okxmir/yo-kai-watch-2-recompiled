@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Version='')
+param([string]$Version='', [string]$LauncherPath='')
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 . (Join-Path $root 'scripts/hash.ps1')
@@ -17,7 +17,8 @@ function Invoke-Rar([string]$Arguments,[string]$Directory){
     $child=[Diagnostics.Process]::Start($start)
     try{$child.StandardInput.Close();if(!$child.WaitForExit(120000)){$child.Kill();throw 'RAR operation timed out'};if($child.ExitCode -ne 0){throw "RAR operation failed: $($child.ExitCode)"}}finally{$child.Dispose()}
 }
-$launcher=Join-Path $root 'dist/Launcher.exe'
+if(!$LauncherPath){$LauncherPath=Join-Path $root 'dist/Launcher.exe'}
+$launcher=(Resolve-Path -LiteralPath $LauncherPath).Path
 if([Reflection.AssemblyName]::GetAssemblyName($launcher).Version.ToString(3) -ne $Version){throw 'Compile the current launcher before packaging.'}
 $out=Join-Path $root 'packages';New-Item -ItemType Directory $out -Force|Out-Null
 $stage=Join-Path $out ('release-v'+$Version+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss'));New-Item -ItemType Directory $stage -ErrorAction Stop|Out-Null
