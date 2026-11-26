@@ -29,7 +29,7 @@ Generate source-only platform builder archives with `powershell -ExecutionPolicy
 Use a recent Linux distribution with Python 3, Tk, CMake 3.24+ and a C/C++20 compiler. On Ubuntu 24.04 or Debian 13, install the prerequisites if not already present:
 
 ```sh
-sudo apt install build-essential cmake ninja-build python3 python3-tk curl ca-certificates tar libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libasound2-dev libpulse-dev libudev-dev libvulkan-dev
+sudo apt install build-essential cmake ninja-build pkg-config python3 python3-tk curl ca-certificates tar libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libxtst-dev libwayland-dev libxkbcommon-dev libegl-dev libdecor-0-dev libasound2-dev libpulse-dev libudev-dev libvulkan-dev
 ```
 
 Extract with `tar -xzf`, open the extracted folder, and run `./YoKaiWatch2Builder` or `bash YoKaiWatch2Builder`. You can also build without the graphical launcher:
